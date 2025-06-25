@@ -9,7 +9,7 @@ inherit cmake pkgconfig systemd
 DEPENDS = "virtual/kernel nng"
 RDEPENDS:${PN} += "nng"
 
-SRC_URI = "${TELECHIPS_AUTOMOTIVE_MULTIMEDIA_GIT}/vehicle-camera-framework.git;protocol=${ALS_GIT_PROTOCOL};branch=${ALS_BRANCH}; \
+SRC_URI = "${TELECHIPS_AUTOMOTIVE_MULTIMEDIA_GIT}/Backup-vehicle-camera-framework.git;protocol=${ALS_GIT_PROTOCOL};branch=${ALS_BRANCH}; \
             file://vehicle-camera-framework.service \
             "
 

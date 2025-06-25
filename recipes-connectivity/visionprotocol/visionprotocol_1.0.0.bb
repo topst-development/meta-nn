@@ -3,7 +3,7 @@ SECTION = "applications"
 LICENSE = "Telechips"
 LIC_FILES_CHKSUM = "file://${COREBASE}/meta-telechips/meta-core/licenses/Telechips;md5=e23a23ed6facb2366525db53060c05a4"
 
-SRC_URI =  "${TELECHIPS_AUTOMOTIVE_GIT}/visionprotocol;protocol=${ALS_GIT_PROTOCOL};branch=${ALS_BRANCH};"
+SRC_URI =  "${TELECHIPS_AUTOMOTIVE_GIT}/Backup-visionprotocol;protocol=${ALS_GIT_PROTOCOL};branch=${ALS_BRANCH};"
 SRCREV = "${AUTOREV}"
 
 inherit pkgconfig cmake
