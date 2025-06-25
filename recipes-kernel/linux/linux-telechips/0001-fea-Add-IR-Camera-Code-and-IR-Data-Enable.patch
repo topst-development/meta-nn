@@ -1,0 +1,1187 @@
+From b03f7ab65a2a23a5fda92b1d5557b02adb6e89e4 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?=EA=B9=80=ED=98=95=EB=8F=88=20=28HyungDon=20Kim=29?=
+ <hd.kim@telechips.com>
+Date: Thu, 7 Dec 2023 15:20:43 +0900
+Subject: [PATCH] [fea] Add IR Camera Code and IR Data Enable
+
+Symptom :
+
+Cause :
+There is no IR camera code.
+There is no IR Format.
+
+Resolution :
+Add IR Camera Code and temporary IR Format
+
+Linked Commit:
+TCS:TMAPT-3623
+
+Change-Id: Ie9afd4b404a7dabb7e18ae0249592496bd475e2c
+---
+ .../override/tcc7500-videoinput-lpd4x321.dtsi |  10 +-
+ .../tcc750x-videoinput-camera-module.dtsi     |   3 +-
+ ...deoinput-odw-mipi0-fhd-ar0239-ispless.dtsi | 239 +++++++
+ .../telechips/tcc750x/tcc750x-videoinput.dtsi |   8 +-
+ drivers/media/i2c/Kconfig                     |  12 +
+ drivers/media/i2c/telechips/Makefile          |   1 +
+ drivers/media/i2c/telechips/tcc-ar0239.c      | 627 ++++++++++++++++++
+ drivers/media/i2c/telechips/tcc-max96712.c    |   3 +-
+ .../platform/tcc-dewarp/750x/tcc-dewarp-odw.c |   3 +-
+ .../platform/tcc-dewarp/750x/tcc-dewarp-odw.h |   4 +
+ .../platform/tcc-dewarp/tcc-dewarp-video.c    |  54 +-
+ 11 files changed, 943 insertions(+), 21 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/telechips/tcc750x/override/tcc750x-videoinput-odw-mipi0-fhd-ar0239-ispless.dtsi
+ create mode 100644 drivers/media/i2c/telechips/tcc-ar0239.c
+
+diff --git a/arch/arm64/boot/dts/telechips/tcc750x/override/tcc7500-videoinput-lpd4x321.dtsi b/arch/arm64/boot/dts/telechips/tcc750x/override/tcc7500-videoinput-lpd4x321.dtsi
+index 226911ff04fa..9ee44fd8ad53 100644
+--- a/arch/arm64/boot/dts/telechips/tcc750x/override/tcc7500-videoinput-lpd4x321.dtsi
++++ b/arch/arm64/boot/dts/telechips/tcc750x/override/tcc7500-videoinput-lpd4x321.dtsi
+@@ -67,6 +67,12 @@ ar0231: ar0231@10 {
+ 		reg		= <0x10>;
+ 	};
+ 
++	ar0239: ar0239@10 {
++		status		= "disabled";
++		compatible	= "tcc-onnn,ar0239";
++		reg		= <0x10>;
++	};
++
+ 	/* external ISP */
+ 	cxd5700: cxd5700@18 {
+ 		status		= "disabled";
+@@ -75,11 +81,11 @@ cxd5700: cxd5700@18 {
+ 	};
+ 
+ 	/* serializer */
+-	max96717: max96717@40 {
++	max96717: max96717@42 {
+ 		/* imx424 rear cam */
+ 		status		= "disabled";
+ 		compatible	= "tcc-maxim,max96717";
+-		reg		= <0x40>;
++		reg		= <0x42>;
+ 	};
+ 
+ 	max96701: max96701@40 {
+diff --git a/arch/arm64/boot/dts/telechips/tcc750x/override/tcc750x-videoinput-camera-module.dtsi b/arch/arm64/boot/dts/telechips/tcc750x/override/tcc750x-videoinput-camera-module.dtsi
+index c67860c88015..08dbc1585638 100644
+--- a/arch/arm64/boot/dts/telechips/tcc750x/override/tcc750x-videoinput-camera-module.dtsi
++++ b/arch/arm64/boot/dts/telechips/tcc750x/override/tcc750x-videoinput-camera-module.dtsi
+@@ -3,4 +3,5 @@
+  * Copyright (C) Telechips Inc.
+  */
+ 
+-#include "tcc750x-videoinput-odw-mipi0-fhd.dtsi"
++//#include "tcc750x-videoinput-odw-mipi0-fhd.dtsi"
++#include "tcc750x-videoinput-odw-mipi0-fhd-ar0239-ispless.dtsi"
+diff --git a/arch/arm64/boot/dts/telechips/tcc750x/override/tcc750x-videoinput-odw-mipi0-fhd-ar0239-ispless.dtsi b/arch/arm64/boot/dts/telechips/tcc750x/override/tcc750x-videoinput-odw-mipi0-fhd-ar0239-ispless.dtsi
+new file mode 100644
+index 000000000000..d75b92d86841
+--- /dev/null
++++ b/arch/arm64/boot/dts/telechips/tcc750x/override/tcc750x-videoinput-odw-mipi0-fhd-ar0239-ispless.dtsi
+@@ -0,0 +1,239 @@
++// SPDX-License-Identifier: (GPL-2.0-or-later OR MIT)
++/*
++ * Copyright (C) Telechips Inc.
++ */
++
++&i2c3 {
++	status = "okay";
++};
++
++&ar0239 {
++	/* Camera Image Sensor */
++	status		= "okay";
++	port {
++		ar0239_out: endpoint {
++			remote-endpoint = <&max96717_in>;
++			io-direction	= "output";
++		};
++	};
++};
++
++&max96717 {
++	/* serializer */
++	reg		= <0x42>; /* override slave addr */
++	status		= "okay";
++	pvd-name	= "fhd_ar0239";
++	ports {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		port@0 {
++			reg = <0>;
++			max96717_in: endpoint {
++				remote-endpoint = <&ar0239_out>;
++				io-direction	= "input";
++			};
++		};
++		port@1 {
++			reg = <1>;
++			max96717_out: endpoint {
++				remote-endpoint = <&max96712_in0>;
++				io-direction	= "output";
++			};
++		};
++	};
++};
++
++&max96712 {
++	/* deserializer */
++	status		= "okay";
++	pvd-name	= "fhd_ar0239";
++
++	ports {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		/*
++		 * 0 ~ 3
++		 * input ports. The number is matched with VC
++		 *
++		 * 4
++		 * output port.
++		 */
++		port@0 {
++			reg = <0>;
++			max96712_in0: endpoint {
++				remote-endpoint = <&max96717_out>;
++				io-direction	= "input";
++				channel		= <0>;
++			};
++		};
++		port@1 {
++			reg = <1>;
++			max96712_in1: endpoint {
++				io-direction	= "input";
++				channel		= <1>;
++			};
++		};
++		port@2 {
++			reg = <2>;
++			max96712_in2: endpoint {
++				io-direction	= "input";
++				channel		= <2>;
++			};
++		};
++		port@3 {
++			reg = <3>;
++			max96712_in3: endpoint {
++				io-direction	= "input";
++				channel		= <3>;
++			};
++		};
++		port@4 {
++			reg = <4>;
++			max96712_out: endpoint {
++				remote-endpoint = <&mipi_csi2_0_in>;
++				io-direction	= "output";
++			};
++		};
++	};
++};
++
++&mipi_csi2_0 {
++	status = "okay";
++	ports {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		/*
++		 * 0
++		 * input port.
++		 *
++		 * 1 ~ 4
++		 * output ports. (1: VC0 ~ 4: VC3)
++		 */
++		port@0 {
++			reg = <0>;
++			mipi_csi2_0_in: endpoint {
++				remote-endpoint	= <&max96712_out>;
++				io-direction	= "input";
++				num-channel	= <4>;
++				deskew-enable = <0>;
++
++				/*
++				 * 0: CH0 only, no data interleave
++				 * 1: DT only
++				 * 2: VC only
++				 * 3: VC and DT
++				 */
++				interleave-mode = <3>;
++				/* datarate is clock lane's frequency x 2 */
++				hs-settle = <22>;
++				data-lanes = <1 2 3 4>;
++			};
++		};
++		port@1 {
++			reg = <1>;
++			mipi_csi2_0_out0: endpoint {
++				remote-endpoint = <&isp0_in>;
++				io-direction	= "output";
++				channel		= <0>;
++				/*
++				 * 0: Single pixel mode
++				 * 1: Dual pixel mode (RAW8/10/12, YUV422)
++				 * 2: Quad pixel mode (RAW8/10/12)
++				 * 3: Invalid
++				 */
++				pixel-mode = <0>;
++			};
++		};
++		port@2 {
++			reg = <2>;
++			mipi_csi2_0_out1: endpoint {
++				io-direction	= "output";
++				channel		= <1>;
++				pixel-mode = <1>;
++			};
++		};
++		port@3 {
++			reg = <3>;
++			mipi_csi2_0_out2: endpoint {
++				//remote-endpoint = <&isp2_in>;
++				io-direction	= "output";
++				//channel		= <0>;
++				channel		= <2>;
++				pixel-mode = <0>;
++			};
++		};
++		port@4 {
++			reg = <4>;
++			mipi_csi2_0_out3: endpoint {
++				io-direction	= "output";
++				channel		= <3>;
++				pixel-mode = <0>;
++			};
++		};
++	};
++};
++
++&isp0 {
++	status = "okay";
++	/*
++	 * 0: RGGB
++	 * 1: RCCB (ISP0 only)
++	 * 2: RCCC (ISP0 only)
++	 * 3: RGBIR (ISP0 only)
++	 */
++	cfa = <3>;
++	mem_share = <1>;
++	/*
++	 * 0: GBIRG
++	 * 1: BGGIR
++	 * 2: IRGGB
++	 * 3: GIRBG
++	 * 4: GRIRG
++	 * 5: RGGIR
++	 * 6: IRGGR
++	 * 7: GIRRG
++	 */
++	rgbir-order = <7>;
++
++	out_win_crop = <6 8>;
++
++	ports {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		port@0 {
++			reg = <0>;
++			isp0_in: endpoint {
++				remote-endpoint = <&mipi_csi2_0_out0>;
++				io-direction	= "input";
++			};
++		};
++		port@1 {
++			reg = <1>;
++			isp0_out: endpoint {
++				remote-endpoint	= <&videoinput0_in>;
++				io-direction	= "output";
++			};
++		};
++	};
++};
++
++&videoinput0 {
++	status		= "okay";
++	cam-ch		= <0>;
++	interrupt-delay = <0x1000>;
++	/* memory-region
++	 *  - [0]: parking guideline
++	 *  - [1]: deinterlacing by viqe
++	 *  - [2]: preview
++	 *  - [3]: last frame
++	 */
++	memory-region	= <0
++			   &pmap_rearcamera>;
++
++	port {
++		videoinput0_in: endpoint {
++			remote-endpoint	= <&isp0_out>;
++			io-direction	= "input";
++		};
++	};
++};
+diff --git a/arch/arm64/boot/dts/telechips/tcc750x/tcc750x-videoinput.dtsi b/arch/arm64/boot/dts/telechips/tcc750x/tcc750x-videoinput.dtsi
+index cc2edaee72b1..c754fbb30047 100644
+--- a/arch/arm64/boot/dts/telechips/tcc750x/tcc750x-videoinput.dtsi
++++ b/arch/arm64/boot/dts/telechips/tcc750x/tcc750x-videoinput.dtsi
+@@ -101,10 +101,10 @@ mipi_wrap: mipi_wrap {
+ 		 * 1: bypass isp
+ 		 * 0: use isp
+ 		 */
+-		isp0-bypass = <1>;
+-		isp1-bypass = <1>;
+-		isp2-bypass = <1>;
+-		isp3-bypass = <1>;
++		isp0-bypass = <0>;
++		isp1-bypass = <0>;
++		isp2-bypass = <0>;
++		isp3-bypass = <0>;
+ 
+ 		mipi_csi2_0: mipi_csi2_0@16008000 {
+ 			compatible = "telechips,tcc750x-mipi-csi2";
+diff --git a/drivers/media/i2c/Kconfig b/drivers/media/i2c/Kconfig
+index d96badc937d4..7960f8930a93 100644
+--- a/drivers/media/i2c/Kconfig
++++ b/drivers/media/i2c/Kconfig
+@@ -1467,6 +1467,18 @@ config VIDEO_TCC_AR0231
+ 	  To compile this driver as a module, choose M here: the
+ 	  module will be called ar0231.
+ 
++config VIDEO_TCC_AR0239
++	tristate "Onsemiconductor AR0239 CIS"
++	depends on GPIOLIB && VIDEO_V4L2 && I2C
++	depends on VIDEO_V4L2_SUBDEV_API
++	select V4L2_FWNODE
++	help
++	  Say Y to include support for Onsemiconductor AR0239 CIS. AR0239 is
++	  ISP-less camera module. By default, this is disabled in Telechips EVB.
++
++	  To compile this driver as a module, choose M here: the
++	  module will be called ar0239.
++
+ config VIDEO_TCC_CXD5700
+ 	tristate "Sony CXD5700 ISP"
+ 	depends on GPIOLIB && VIDEO_V4L2 && I2C
+diff --git a/drivers/media/i2c/telechips/Makefile b/drivers/media/i2c/telechips/Makefile
+index 45d398010c2f..2d08e52028e8 100644
+--- a/drivers/media/i2c/telechips/Makefile
++++ b/drivers/media/i2c/telechips/Makefile
+@@ -10,6 +10,7 @@ obj-$(CONFIG_VIDEO_TCC_ARXXXX)		+= tcc-arxxxx.o
+ obj-$(CONFIG_VIDEO_TCC_AR0820)		+= tcc-ar0820.o
+ obj-$(CONFIG_VIDEO_TCC_AR0147)		+= tcc-ar0147.o
+ obj-$(CONFIG_VIDEO_TCC_AR0231)		+= tcc-ar0231.o
++obj-$(CONFIG_VIDEO_TCC_AR0239)		+= tcc-ar0239.o
+ obj-$(CONFIG_VIDEO_TCC_AR0144)		+= tcc-ar0144.o
+ # External ISP(in camera module)
+ obj-$(CONFIG_VIDEO_TCC_CXD5700)		+= tcc-cxd5700.o
+diff --git a/drivers/media/i2c/telechips/tcc-ar0239.c b/drivers/media/i2c/telechips/tcc-ar0239.c
+new file mode 100644
+index 000000000000..7a4b42298ba3
+--- /dev/null
++++ b/drivers/media/i2c/telechips/tcc-ar0239.c
+@@ -0,0 +1,627 @@
++// SPDX-License-Identifier: GPL-2.0
++/****************************************************************************
++ *
++ * Copyright (C) 2018 Telechips Inc.
++ *
++ ****************************************************************************/
++
++#include <linux/module.h>
++#include <linux/slab.h>
++#include <linux/delay.h>
++#include <linux/of_graph.h>
++#include <linux/gpio.h>
++#include <linux/regmap.h>
++#include <linux/i2c.h>
++#include <linux/types.h>
++#include <linux/videodev2.h>
++#include <media/v4l2-async.h>
++#include <media/v4l2-common.h>
++#include <media/v4l2-ctrls.h>
++#include <media/v4l2-device.h>
++#include <media/v4l2-mediabus.h>
++#include <linux/kdev_t.h>
++#include <linux/of_gpio.h>
++#include <media/v4l2-ctrls.h>
++#include <media/v4l2-dev.h>
++#include <media/v4l2-subdev.h>
++#include <media/v4l2-fwnode.h>
++
++#define LOG_TAG				"VSRC:AR0239"
++
++#define loge(fmt, ...) \
++	pr_err("[ERROR][%s] %s - "	fmt, LOG_TAG, __func__, ##__VA_ARGS__)
++#define logw(fmt, ...) \
++	pr_warn("[WARN][%s] %s - "	fmt, LOG_TAG, __func__, ##__VA_ARGS__)
++#define logd(fmt, ...) \
++	pr_debug("[DEBUG][%s] %s - "	fmt, LOG_TAG, __func__, ##__VA_ARGS__)
++#define logi(fmt, ...) \
++	pr_info("[INFO][%s] %s - "	fmt, LOG_TAG, __func__, ##__VA_ARGS__)
++
++#define	AR0239_DEFAULT_FRAMERATE (30)
++
++#define AR0239_DEFAULT_WIDTH (1920U + 12U)
++#define AR0239_DEFAULT_HEIGHT (1080U + 16U)
++
++#define AR0239_PAD_SRC (0U)
++#define AR0239_PAD_NUM (1U)
++
++static const struct v4l2_mbus_framefmt ar0239_mbus_frmfmt_default = {
++	.width = AR0239_DEFAULT_WIDTH,
++	.height	= AR0239_DEFAULT_HEIGHT,
++	.code = MEDIA_BUS_FMT_SGRBG12_1X12, /* it doesn't matter if RGB-IR */
++	.field = V4L2_FIELD_NONE,
++};
++
++struct frame_size {
++	u32 width;
++	u32 height;
++};
++
++/*
++ * This object contains essential v4l2 objects
++ * such as sub-device and ctrl_handler
++ */
++struct ar0239 {
++	struct i2c_client		*clinet;
++	struct v4l2_subdev		sd;
++	struct v4l2_ctrl_handler	hdl;
++
++	struct media_pad		pad;
++	struct v4l2_mbus_framefmt	fmt;
++	int				framerate;
++
++	/* Regmaps */
++	struct regmap			*regmap;
++
++	struct mutex lock;
++	unsigned int p_cnt;
++	unsigned int s_cnt;
++	unsigned int i_cnt;
++};
++
++const struct reg_sequence ar0239_reg_init[] = {
++	// Register Log created on Friday, October 14, 2022 : 13:59:07
++	// [Register Log 10/14/22 13:59:07]
++	{0x301A, 0x0001, 400 * 1000}, // RESET_REGISTER
++	{0x3324, 0x001C, 0}, // ATTENUATION_CTRL
++	{0x30B4, 0x01C1, 0}, // TEMPSENS_CTRL_REG
++	{0x3092, 0x006F, 0}, // ROW_NOISE_CONTROL
++	{0x31AC, 0x0C0C, 0}, // DATA_FORMAT_BITS
++	{0x3030, 0x0080, 0}, // PLL_MULTIPLIER
++	{0x302E, 0x0009, 0}, // PRE_PLL_CLK_DIV
++	{0x302C, 0x0001, 0}, // VT_SYS_CLK_DIV
++	{0x302A, 0x0006, 0}, // VT_PIX_CLK_DIV
++	{0x3038, 0x0001, 0}, // OP_SYS_CLK_DIV
++	{0x3036, 0x000C, 0}, // OP_PIX_CLK_DIV
++	{0x3082, 0x0001, 0}, // OPERATION_MODE_CTRL
++	{0x318E, 0x0000, 0}, // HDR_MC_CTRL3
++	{0x31D0, 0x0000, 0}, // COMPANDING
++	{0x3004, 0x0002, 0}, //X_ADDR_START = 2
++	{0x3008, 0x078D, 0}, //X_ADDR_END = 1933
++	{0x3002, 0x002E, 0}, //Y_ADDR_START = 46
++	{0x3006, 0x0475, 0}, //Y_ADDR_END = 1141
++	{0x300C, 0x0776, 0}, //LINE_LENGTH_PCK = 1910
++	{0x300A, 0x045C, 0}, //FRAME_LENGTH_LINES = 1116
++	{0x3012, 0x044B, 0}, // COARSE_INTEGRATION_TIME
++	{0x301A, 0x2058, 0}, // RESET_REGISTER
++	{0x31AE, 0x0204, 0}, // SERIAL_FORMAT
++	{0x3354, 0x002C, 0}, // MIPI_CNTRL
++	{0x30B0, 0x022A, 0}, // DIGITAL_TEST
++	{0x31B0, 0x0090, 0}, // FRAME_PREAMBLE
++	{0x31B2, 0x0065, 0}, // LINE_PREAMBLE
++	{0x31B4, 0x2A86, 0}, // MIPI_TIMING_0
++	{0x31B6, 0x21D6, 0}, // MIPI_TIMING_1
++	{0x31B8, 0x6049, 0}, // MIPI_TIMING_2
++	{0x31BA, 0x0208, 0}, // MIPI_TIMING_3
++	{0x31BC, 0x8007, 0}, // MIPI_TIMING_4
++	{0x3064, 0x1802, 0}, // SMIA_TEST
++	{0x301A, 0x205C, 0}, // RESET_REGISTER
++	{0x3F4E, 0x3E3C, 0}, // PIX_DEF_1D_DDC_HI_DEF
++	{0x3F50, 0x080B, 0}, // PIX_DEF_1D_DDC_EDGE
++};
++
++static const struct regmap_config ar0239_regmap = {
++	.reg_bits		= 16,
++	.val_bits		= 16,
++
++	.max_register		= 0xFFFF,
++	.cache_type		= REGCACHE_NONE,
++};
++
++static struct frame_size ar0239_framesizes[] = {
++	{	AR0239_DEFAULT_WIDTH,	AR0239_DEFAULT_HEIGHT	},
++};
++
++static u32 ar0239_framerates[] = {
++	AR0239_DEFAULT_FRAMERATE,
++};
++
++/*
++ * v4l2_ctrl_ops implementations
++ */
++static int ar0239_s_ctrl(struct v4l2_ctrl *ctrl)
++{
++	int			ret	= 0;
++
++	switch (ctrl->id) {
++	case V4L2_CID_BRIGHTNESS:
++	case V4L2_CID_CONTRAST:
++	case V4L2_CID_SATURATION:
++	case V4L2_CID_HUE:
++	case V4L2_CID_DO_WHITE_BALANCE:
++	default:
++		loge("V4L2_CID_BRIGHTNESS is not implemented yet.\n");
++		ret = -EINVAL;
++	}
++
++	return ret;
++}
++
++static int ar0239_parse_device_tree(struct ar0239 *dev, struct device_node *node)
++{
++	int ret = 0;
++
++	if (node == NULL) {
++		loge("the device tree is empty\n");
++		ret = -ENODEV;
++	}
++
++
++	return ret;
++}
++
++/*
++ * Helper functions for reflection
++ */
++static inline struct ar0239 *to_dev(struct v4l2_subdev *sd)
++{
++	return container_of(sd, struct ar0239, sd);
++}
++
++/*
++ * v4l2_subdev_core_ops implementations
++ */
++static int ar0239_init(struct v4l2_subdev *sd, u32 enable)
++{
++	struct ar0239		*dev	= to_dev(sd);
++	int			ret	= 0;
++
++	mutex_lock(&dev->lock);
++
++	if ((dev->i_cnt == 0) && (enable == 1)) {
++		/* enable ar0239 */
++		ret = regmap_multi_reg_write(dev->regmap,
++				ar0239_reg_init,
++				ARRAY_SIZE(ar0239_reg_init));
++		if (ret) {
++			/* err status */
++			loge("regmap_multi_reg_write returned %d\n", ret);
++		}
++	} else if ((dev->i_cnt == 1) && (enable == 0)) {
++		/* disable ar0239 */
++	}
++
++	if (enable)
++		dev->i_cnt++;
++	else
++		dev->i_cnt--;
++
++	mutex_unlock(&dev->lock);
++
++	return ret;
++}
++
++#ifdef CONFIG_VIDEO_ADV_DEBUG
++static int32_t ar0239_g_register(struct v4l2_subdev *sd,
++				 struct v4l2_dbg_register *reg)
++{
++	const struct ar0239 *dev = to_dev(sd);
++	uint32_t val = 0U;
++	int32_t ret = 0;
++
++	ret = regmap_read(dev->regmap, reg->reg, &val);
++	if (ret < 0) {
++		/* error */
++		loge("ar0239_core_get_reg returned %d\n", ret);
++	} else {
++		/* okay */
++		reg->val = val;
++	}
++
++	return ret;
++}
++
++static int32_t ar0239_s_register(struct v4l2_subdev *sd,
++				 const struct v4l2_dbg_register *reg)
++{
++	const struct ar0239 *dev = to_dev(sd);
++	int32_t ret = 0;
++
++	if (ret >= 0) {
++		ret = regmap_write(dev->regmap, reg->reg, reg->val);
++		if (ret < 0) {
++			/* error */
++			loge("ar0239_core_set_reg returned %d\n", ret);
++		}
++	}
++
++	return ret;
++}
++#endif
++
++/*
++ * v4l2_subdev_video_ops implementations
++ */
++static int ar0239_s_stream(struct v4l2_subdev *sd, int enable)
++{
++	struct ar0239 *dev = to_dev(sd);
++	int ret = 0;
++
++	mutex_lock(&dev->lock);
++
++	mutex_unlock(&dev->lock);
++
++	return ret;
++}
++
++static int ar0239_g_frame_interval(struct v4l2_subdev *sd,
++	struct v4l2_subdev_frame_interval *interval)
++{
++	struct ar0239		*dev	= NULL;
++
++	dev = to_dev(sd);
++	if (!dev) {
++		loge("Failed to get video source object by subdev\n");
++		return -EINVAL;
++	}
++
++	interval->pad = 0;
++	interval->interval.numerator = 1;
++	interval->interval.denominator = dev->framerate;
++
++	return 0;
++}
++
++static int ar0239_s_frame_interval(struct v4l2_subdev *sd,
++	struct v4l2_subdev_frame_interval *interval)
++{
++	struct ar0239		*dev	= NULL;
++
++	dev = to_dev(sd);
++	if (!dev) {
++		loge("Failed to get video source object by subdev\n");
++		return -EINVAL;
++	}
++
++	/* set framerate with i2c setting if supported */
++
++	dev->framerate = interval->interval.denominator;
++
++	return 0;
++}
++
++/*
++ * v4l2_subdev_pad_ops implementations
++ */
++static int32_t ar0239_init_cfg(struct v4l2_subdev *sd,
++			       struct v4l2_subdev_pad_config *cfg)
++{
++	struct v4l2_mbus_framefmt *try;
++	struct v4l2_subdev_format fmt;
++	unsigned int pad;
++	int32_t ret = 0;
++
++	for (pad = 0; pad < sd->entity.num_pads; pad++) {
++		memset(&fmt, 0, sizeof(fmt));
++
++		fmt.pad = pad;
++		fmt.which = V4L2_SUBDEV_FORMAT_ACTIVE;
++		ret = v4l2_subdev_call(sd, pad, get_fmt, NULL, &fmt);
++		if (ret < 0) {
++			loge("get_fmt returned %d\n", ret);
++			break;
++		}
++
++		try = v4l2_subdev_get_try_format(sd, cfg, pad);
++		*try = fmt.format;
++	}
++
++	return ret;
++}
++
++static int ar0239_enum_frame_size(struct v4l2_subdev *sd,
++	struct v4l2_subdev_pad_config *cfg,
++	struct v4l2_subdev_frame_size_enum *fse)
++{
++	struct frame_size	*size		= NULL;
++
++	if (ARRAY_SIZE(ar0239_framesizes) <= fse->index) {
++		logd("index(%u) is wrong\n", fse->index);
++		return -EINVAL;
++	}
++
++	size = &ar0239_framesizes[fse->index];
++	logd("size: %u * %u\n", size->width, size->height);
++
++	fse->min_width = fse->max_width = size->width;
++	fse->min_height	= fse->max_height = size->height;
++	logd("max size: %u * %u\n", fse->max_width, fse->max_height);
++
++	return 0;
++}
++
++static int ar0239_enum_frame_interval(struct v4l2_subdev *sd,
++	struct v4l2_subdev_pad_config *cfg,
++	struct v4l2_subdev_frame_interval_enum *fie)
++{
++	if (ARRAY_SIZE(ar0239_framerates) <= fie->index) {
++		logd("index(%u) is wrong\n", fie->index);
++		return -EINVAL;
++	}
++
++	fie->interval.numerator = 1;
++	fie->interval.denominator = ar0239_framerates[fie->index];
++	logd("framerate: %u / %u\n",
++		fie->interval.numerator, fie->interval.denominator);
++
++	return 0;
++}
++
++static int ar0239_get_fmt(struct v4l2_subdev *sd,
++			  struct v4l2_subdev_pad_config *cfg,
++			  struct v4l2_subdev_format *f)
++{
++	struct ar0239 *dev = to_dev(sd);
++	int ret = 0;
++
++	mutex_lock(&dev->lock);
++
++	if (f->pad >= AR0239_PAD_NUM) {
++		/* error */
++		loge("invalid pad num(%d)\n", f->pad);
++		ret = -EINVAL;
++	} else {
++		if (f->which == V4L2_SUBDEV_FORMAT_TRY) {
++			/* get try format */
++			f->format =
++				*v4l2_subdev_get_try_format(sd, cfg, f->pad);
++		} else {
++			/* get active format */
++			f->format = dev->fmt;
++		}
++	}
++
++	mutex_unlock(&dev->lock);
++
++	return ret;
++}
++
++static int ar0239_set_fmt(struct v4l2_subdev *sd,
++			  struct v4l2_subdev_pad_config *cfg,
++			  struct v4l2_subdev_format *f)
++{
++	struct ar0239 *dev = to_dev(sd);
++	struct v4l2_mbus_framefmt *fmt = NULL;
++	int ret = 0;
++
++	mutex_lock(&dev->lock);
++
++	/* check pad */
++	if (f->pad >= AR0239_PAD_NUM) {
++		/* error */
++		loge("invalid pad num(%d)\n", f->pad);
++		ret = -EINVAL;
++	}
++
++	/* get try or active mbus framefmt pointer */
++	if (ret >= 0) {
++		if (f->which == V4L2_SUBDEV_FORMAT_TRY) {
++			/* get try format */
++			fmt = v4l2_subdev_get_try_format(sd, cfg, f->pad);
++		} else {
++			/* get active format */
++			fmt = &dev->fmt;
++		}
++	}
++
++	*fmt = f->format;
++
++	mutex_unlock(&dev->lock);
++
++	return ret;
++}
++
++/*
++ * v4l2_subdev_internal_ops implementations
++ */
++static int ar0239_registered(struct v4l2_subdev *sd)
++{
++	int ret = 0;
++
++	logd("registered with v4l2 dev\n");
++
++	return ret;
++}
++
++/*
++ * v4l2_subdev_ops implementations
++ */
++static const struct v4l2_ctrl_ops ar0239_ctrl_ops = {
++	.s_ctrl			= ar0239_s_ctrl,
++};
++
++static const struct v4l2_subdev_core_ops ar0239_core_ops = {
++	.init			= ar0239_init,
++#ifdef CONFIG_VIDEO_ADV_DEBUG
++	.g_register		= ar0239_g_register,
++	.s_register		= ar0239_s_register,
++#endif
++};
++
++static const struct v4l2_subdev_video_ops ar0239_video_ops = {
++	.s_stream		= ar0239_s_stream,
++	.g_frame_interval	= ar0239_g_frame_interval,
++	.s_frame_interval	= ar0239_s_frame_interval,
++};
++
++static const struct v4l2_subdev_pad_ops ar0239_pad_ops = {
++	.init_cfg		= ar0239_init_cfg,
++	.enum_frame_size	= ar0239_enum_frame_size,
++	.enum_frame_interval	= ar0239_enum_frame_interval,
++	.get_fmt		= ar0239_get_fmt,
++	.set_fmt		= ar0239_set_fmt,
++};
++
++static const struct v4l2_subdev_ops ar0239_ops = {
++	.core			= &ar0239_core_ops,
++	.video			= &ar0239_video_ops,
++	.pad			= &ar0239_pad_ops,
++};
++
++static const struct v4l2_subdev_internal_ops ar0239_internal_ops = {
++	.registered = ar0239_registered,
++};
++
++struct ar0239 ar0239_data = {
++};
++
++static const struct i2c_device_id ar0239_id[] = {
++	{ "ar0239", 0, },
++	{ }
++};
++MODULE_DEVICE_TABLE(i2c, ar0239_id);
++
++#if IS_ENABLED(CONFIG_OF)
++static const struct of_device_id ar0239_of_match[] = {
++	{
++		.compatible	= "onnn,ar0239",
++		.data		= &ar0239_data,
++	},
++	{}
++};
++MODULE_DEVICE_TABLE(of, ar0239_of_match);
++#endif
++
++int ar0239_probe(struct i2c_client *client, const struct i2c_device_id *id)
++{
++	struct ar0239			*dev	= NULL;
++	const struct of_device_id	*dev_id	= NULL;
++	int				ret	= 0;
++	/* allocate and clear memory for a device */
++	dev = devm_kzalloc(&client->dev, sizeof(struct ar0239), GFP_KERNEL);
++	if (dev == NULL) {
++		loge("Allocate a device struct.\n");
++		return -ENOMEM;
++	}
++
++	/* set the specific information */
++	if (client->dev.of_node) {
++		dev_id = of_match_node(ar0239_of_match, client->dev.of_node);
++		//memcpy(dev, (const void *)dev_id->data, sizeof(struct ar0239));
++		dev = &ar0239_data;
++	}
++
++	logd("name: %s, addr: 0x%x, client: 0x%p\n",
++		client->name, (client->addr)<<1, client);
++
++	mutex_init(&dev->lock);
++
++	/* parse device tree */
++	ret = ar0239_parse_device_tree(dev, client->dev.of_node);
++	if (ret < 0) {
++		loge("cxd5700_parse_device_tree, ret: %d\n", ret);
++		return ret;
++	}
++
++	/* regitster v4l2 control handlers */
++	v4l2_ctrl_handler_init(&dev->hdl, 2);
++	v4l2_ctrl_new_std(&dev->hdl, &ar0239_ctrl_ops,
++		V4L2_CID_BRIGHTNESS, 0, 255, 1, 128);
++	v4l2_ctrl_new_std_menu(&dev->hdl,
++		&ar0239_ctrl_ops,
++		V4L2_CID_DV_RX_IT_CONTENT_TYPE,
++		V4L2_DV_IT_CONTENT_TYPE_NO_ITC,
++		0,
++		V4L2_DV_IT_CONTENT_TYPE_NO_ITC);
++	dev->sd.ctrl_handler = &dev->hdl;
++	if (dev->hdl.error) {
++		loge("v4l2_ctrl_handler_init is wrong\n");
++		ret = dev->hdl.error;
++		goto goto_free_device_data;
++	}
++
++	/* Register with V4L2 layer as a slave device */
++	v4l2_i2c_subdev_init(&dev->sd, client, &ar0239_ops);
++	dev->sd.internal_ops = &ar0239_internal_ops;
++	dev->sd.flags = V4L2_SUBDEV_FL_HAS_DEVNODE;
++	dev->sd.entity.function = MEDIA_ENT_F_CAM_SENSOR;
++	dev->sd.entity.flags = MEDIA_ENT_FL_DEFAULT;
++
++	if (ret >= 0) {
++		/* init pads */
++		dev->pad.index = 0U;
++		dev->pad.flags = MEDIA_PAD_FL_SOURCE;
++		dev->fmt = ar0239_mbus_frmfmt_default;
++		media_entity_pads_init(&dev->sd.entity, AR0239_PAD_NUM,
++				       &dev->pad);
++	}
++
++	/* add async subdevs and register notifier */
++	ret = v4l2_async_register_subdev_sensor_common(&dev->sd);
++	if (ret < 0) {
++		loge("v4l2_async_register_subdev returned %d\n", ret);
++	}
++
++	/* init framerate */
++	dev->framerate = AR0239_DEFAULT_FRAMERATE;
++
++	/* init regmap */
++	dev->regmap = devm_regmap_init_i2c(client, &ar0239_regmap);
++	if (IS_ERR(dev->regmap)) {
++		loge("devm_regmap_init_i2c is wrong\n");
++		ret = -1;
++		goto goto_free_device_data;
++	}
++
++	goto goto_end;
++
++goto_free_device_data:
++	/* free the videosource data */
++	kfree(dev);
++
++goto_end:
++	return ret;
++}
++
++int ar0239_remove(struct i2c_client *client)
++{
++	struct v4l2_subdev	*sd	= i2c_get_clientdata(client);
++	struct ar0239		*dev	= to_dev(sd);
++
++	/* release regmap */
++	regmap_exit(dev->regmap);
++
++	v4l2_ctrl_handler_free(&dev->hdl);
++
++	v4l2_async_unregister_subdev(sd);
++
++	kfree(dev);
++	client = NULL;
++
++	return 0;
++}
++
++static struct i2c_driver ar0239_driver = {
++	.probe		= ar0239_probe,
++	.remove		= ar0239_remove,
++	.driver		= {
++		.name		= "ar0239",
++		.of_match_table	= of_match_ptr(ar0239_of_match),
++	},
++	.id_table	= ar0239_id,
++};
++
++module_i2c_driver(ar0239_driver);
++MODULE_AUTHOR("Telechips Inc.");
++MODULE_DESCRIPTION("Telechips AR0239 Driver");
++MODULE_LICENSE("GPL");
+diff --git a/drivers/media/i2c/telechips/tcc-max96712.c b/drivers/media/i2c/telechips/tcc-max96712.c
+index 52820bb0299b..b614fe1bf593 100644
+--- a/drivers/media/i2c/telechips/tcc-max96712.c
++++ b/drivers/media/i2c/telechips/tcc-max96712.c
+@@ -1403,6 +1403,7 @@ const struct reg_sequence max96712_reg_init_fhd_ar0239[] = {
+ 	 *
+ 	 * SOC should enable DE_SKEW also
+ 	 */
++#if 0
+ 	{0x0943, 0x80, 0},		/* DE_SKEW_INIT
+ 					 * Enable auto initial de-skew packets
+ 					 * with the minimum width 32K UI
+@@ -1411,7 +1412,7 @@ const struct reg_sequence max96712_reg_init_fhd_ar0239[] = {
+ 					 * Enable periodic de-skew packets
+ 					 * with width 2K UI every 4 frames
+ 					 */
+-
++#endif
+ 	/*
+ 	 * Step 1 - GMSL Link Initialization
+ 	 *	Link Enable (register 0x06)
+diff --git a/drivers/media/platform/tcc-dewarp/750x/tcc-dewarp-odw.c b/drivers/media/platform/tcc-dewarp/750x/tcc-dewarp-odw.c
+index 09436284f832..c1d17aa3c4cc 100644
+--- a/drivers/media/platform/tcc-dewarp/750x/tcc-dewarp-odw.c
++++ b/drivers/media/platform/tcc-dewarp/750x/tcc-dewarp-odw.c
+@@ -211,14 +211,13 @@ void dewarp_odw_set_output_address(u32 id, u32 addresses[], u32 ir_enable)
+ 		/* coverity[misra_c_2012_rule_18_4_violation : FALSE] */
+ 		__raw_writel(addresses[0], pODW_reg + ODW_OUTPUT_ADDRESS_0_0);
+ 		__raw_writel(addresses[1], pODW_reg + ODW_OUTPUT_ADDRESS_1_0);
+-		// if (ir_enable == 1U) {
+ 		__raw_writel(addresses[2], pODW_reg + ODW_OUTPUT_ADDRESS_2_0);
+-		// }
+ 		break;
+ 	case 1:
+ 		/* coverity[misra_c_2012_rule_18_4_violation : FALSE] */
+ 		__raw_writel(addresses[0], pODW_reg + ODW_OUTPUT_ADDRESS_0_1);
+ 		__raw_writel(addresses[1], pODW_reg + ODW_OUTPUT_ADDRESS_1_1);
++		__raw_writel(addresses[2], pODW_reg + ODW_OUTPUT_ADDRESS_2_1);
+ 		break;
+ 	default:
+ 		break;
+diff --git a/drivers/media/platform/tcc-dewarp/750x/tcc-dewarp-odw.h b/drivers/media/platform/tcc-dewarp/750x/tcc-dewarp-odw.h
+index 3e19240986f1..49fe434fdf34 100644
+--- a/drivers/media/platform/tcc-dewarp/750x/tcc-dewarp-odw.h
++++ b/drivers/media/platform/tcc-dewarp/750x/tcc-dewarp-odw.h
+@@ -73,6 +73,8 @@
+ #define ODW_OUTPUT_STRIDE_0_1				(0x208U)
+ #define ODW_OUTPUT_ADDRESS_1_1				(0x20CU)
+ #define ODW_OUTPUT_STRIDE_1_1				(0x210U)
++#define ODW_OUTPUT_ADDRESS_2_1				(0x214U)
++#define ODW_OUTPUT_STRIDE_2_1				(0x218U)
+ #define ODW_INPUT_SIZE_1				(0x21CU)
+ #define ODW_DEWARP_SIZE_1				(0x220U)
+ #define ODW_IMAGE_FORMAT_1				(0x224U)
+@@ -149,6 +151,7 @@
+  * ODW Output Format
+  */
+ #define DEWARP_COLOR_FMT_RGB			(0U)
++#define DEWARP_COLOR_FMT_RGB_IR			(1U)
+ #define DEWARP_COLOR_FMT_VYUY			(3U)
+ #define	DEWARP_COLOR_FMT_UYVY			(4U)
+ #define	DEWARP_COLOR_FMT_YVYU			(5U)
+@@ -159,6 +162,7 @@
+ #define	DEWARP_COLOR_FMT_YUV420IL_ODD		(10U)
+ #define	DEWARP_COLOR_FMT_YVU420IL_EVEN		(11U)
+ #define	DEWARP_COLOR_FMT_YUV420IL_EVEN		(12U)
++#define	DEWARP_COLOR_FMT_IR_ONLY		(13U)
+ 
+ /*
+  * ODW_DUMMY_WRITE Register
+diff --git a/drivers/media/platform/tcc-dewarp/tcc-dewarp-video.c b/drivers/media/platform/tcc-dewarp/tcc-dewarp-video.c
+index d719356940f3..06d5173b120d 100644
+--- a/drivers/media/platform/tcc-dewarp/tcc-dewarp-video.c
++++ b/drivers/media/platform/tcc-dewarp/tcc-dewarp-video.c
+@@ -170,6 +170,10 @@ static struct tcc_dewarp_format tcc_dewarp_format_list[] = {
+ 		.pixelformat = V4L2_PIX_FMT_NV61M,
+ 		.guid = DEWARP_COLOR_FMT_YVU422IL,
+ 	},
++	{
++		.pixelformat = V4L2_PIX_FMT_YUV444M,
++		.guid = DEWARP_COLOR_FMT_IR_ONLY,
++	},
+ };
+ 
+ static void tcc_dewarp_get_vs_info_format_by_mbus_format(
+@@ -407,7 +411,7 @@ static int tcc_dewarp_parse_dt(struct tcc_dewarp_stream *vstream,
+ 		(void)of_property_read_u32(dev_node, "interrupt-delay",
+ 					   &odw_params->eof_interrupt_delay);
+ 
+-		logd(p_dev, "%s : %d, %s : %d, odw-dewarp : %d\n",
++		logd(p_dev, "%s : %s, %d : %d, odw-dewarp : %d\n",
+ 		     name_list[ODW_DEV_ID], name_list[ODW_DEV_BYPASS],
+ 		     odw_params->id, odw_params->in.is_bypass,
+ 		     odw_params->in.is_dewarp);
+@@ -737,7 +741,7 @@ static int tcc_dewarp_set_path(struct tcc_dewarp_stream *vstream)
+ 	in->height = vs_info->height;
+ 	in->format = vs_info->data_format;
+ 	// hhj check
+-	in->ir_enable = 0;
++	in->ir_enable = 1;
+ 
+ 	out->width = pix_mp->width;
+ 	out->height = pix_mp->height;
+@@ -776,25 +780,53 @@ static int tcc_dewarp_set_path(struct tcc_dewarp_stream *vstream)
+ 		tcc_dewarp_get_dma_addrs(vstream, vb, dma_addrs);
+ 		tcc_dewarp_print_dma_addrs(vstream, vb, dma_addrs);
+ 
+-		for (idxpln = 0; idxpln < vb->num_planes; idxpln++) {
+-			out->address[idxpln] = dma_addrs[idxpln];
+-			out->strides[idxpln] = out->width * 4;
++		switch (out->format) {
++		case (unsigned int)DEWARP_COLOR_FMT_RGB:
++			out->address[0] = dma_addrs[0];
++			out->strides[0] = out->width * 4;
++			break;
++		case (unsigned int)DEWARP_COLOR_FMT_VYUY:
++		case (unsigned int)DEWARP_COLOR_FMT_UYVY:
++		case (unsigned int)DEWARP_COLOR_FMT_YVYU:
++		case (unsigned int)DEWARP_COLOR_FMT_YUYV:
++			out->address[0] = dma_addrs[0];
++			out->strides[0] = out->width * 2;
++			break;
++		case (unsigned int)DEWARP_COLOR_FMT_YVU422IL:
++		case (unsigned int)DEWARP_COLOR_FMT_YUV422IL:
++		case (unsigned int)DEWARP_COLOR_FMT_YUV420IL_ODD:
++		case (unsigned int)DEWARP_COLOR_FMT_YVU420IL_ODD:
++		case (unsigned int)DEWARP_COLOR_FMT_YUV420IL_EVEN:
++		case (unsigned int)DEWARP_COLOR_FMT_YVU420IL_EVEN:
++			for (idxpln = 0; idxpln < vb->num_planes; idxpln++) {
++				out->address[idxpln] = dma_addrs[idxpln];
++				out->strides[idxpln] = out->width;
++			}
++			break;
++		case (unsigned int)DEWARP_COLOR_FMT_IR_ONLY:
++			for (idxpln = 0; idxpln < vb->num_planes; idxpln++) {
++				out->address[idxpln] = dma_addrs[idxpln];
++				out->strides[idxpln] = out->width;
++			}
++			break;
++		default:
++			break;
+ 		}
+ 
+ 		odw_params->stream_enable = 1;
+ 
+-		logd(dev, "id(%d), in(%d x %d, %d), out(%d x %d, %d)\n",
++		logd(p_dev, "id(%d), in(%d x %d, %d), out(%d x %d, %d)\n",
+ 		     odw_params->id, in->width, in->height, in->format,
+ 		     out->width, out->height, out->format);
+-		logd(dev,
++		logd(p_dev,
+ 		     "id(%d), out->address[0] : 0x%08x, out->address[1] : 0x%08x out->address[2] : 0x%08x\n",
+ 		     odw_params->id, out->address[0], out->address[1],
+ 		     out->address[2]);
+-		logd(dev,
++		logd(p_dev,
+ 		     "id(%d), out->strides[0] : %d, out->strides[1] : %d, out->strides[2] : %d\n",
+ 		     odw_params->id, out->strides[0], out->strides[1],
+ 		     out->strides[2]);
+-		logd(dev,
++		logd(p_dev,
+ 		     "id(%d), ir_enable(%d), is_dewarp(%d), stream_enable(%d), is_bypass(%d)\n",
+ 		     odw_params->id, in->ir_enable, in->is_dewarp,
+ 		     odw_params->stream_enable, in->is_bypass);
+@@ -1343,8 +1375,8 @@ int tcc_dewarp_start_subdevs(struct tcc_dewarp_stream *vstream)
+ 			/* size */
+ 			vs_info->height = timings.bt.height;
+ 			vs_info->width = timings.bt.width;
+-			logd(p_dev, "width: %d, height: %d\n", vs_info->height,
+-			     vs_info->width);
++			logd(p_dev, "width: %d, height: %d\n", vs_info->width,
++			     vs_info->height);
+ 		}
+ 
+ 		ret_call = tcc_dewarp_subdev_core_s_power(subdev, 1);
+-- 
+2.25.1
+

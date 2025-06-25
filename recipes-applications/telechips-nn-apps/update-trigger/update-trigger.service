@@ -1,0 +1,11 @@
+[Unit]
+Description=Executes update program when update file has changed.
+ConditionPathExists=/home/root/update
+
+[Service]
+Type=simple
+ExecStartPre=/bin/rm /home/root/update
+ExecStart=/usr/bin/TcUpdateEngine -c main -t 1 -f /home/root/update_main -l 3
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,2 @@
+PACKAGECONFIG:remove = "gstreamer"
+EXTRA_OECMAKE += "-DWITH_OPENMP=ON"

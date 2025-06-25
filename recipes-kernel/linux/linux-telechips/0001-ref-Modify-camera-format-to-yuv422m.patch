@@ -1,0 +1,27 @@
+From c5aae2db1bde763bdc1bc53c49d6be75fff225e7 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?=EB=B0=95=EC=B0=AC=28Chan=20Park=29?=
+ <chan.park@telechips.com>
+Date: Wed, 13 Dec 2023 17:22:46 +0900
+Subject: [PATCH] [ref] Modify camera format to yuv422m
+
+TCS :
+---
+ drivers/media/platform/tcc-dewarp/tcc-dewarp-video.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/media/platform/tcc-dewarp/tcc-dewarp-video.c b/drivers/media/platform/tcc-dewarp/tcc-dewarp-video.c
+index 06d5173b120d..843d08956ac9 100644
+--- a/drivers/media/platform/tcc-dewarp/tcc-dewarp-video.c
++++ b/drivers/media/platform/tcc-dewarp/tcc-dewarp-video.c
+@@ -156,7 +156,7 @@ static struct tcc_dewarp_format tcc_dewarp_format_list[] = {
+ 	/* two non contiguous planes - one Y, one Cr + Cb interleaved  */
+ 	{
+ 		.pixelformat = V4L2_PIX_FMT_NV12M,
+-		.guid = DEWARP_COLOR_FMT_YUV420IL_ODD,
++		.guid = DEWARP_COLOR_FMT_IR_ONLY,
+ 	},
+ 	{
+ 		.pixelformat = V4L2_PIX_FMT_NV21M,
+-- 
+2.25.1
+

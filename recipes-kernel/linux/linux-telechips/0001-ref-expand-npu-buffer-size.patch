@@ -1,0 +1,36 @@
+From 7b463ebfb171940f0634badbb5f93c2810db4bc2 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?=EB=B0=95=EC=B0=AC=28Chan=20Park=29?=
+ <chan.park@telechips.com>
+Date: Mon, 30 Oct 2023 20:37:57 +0900
+Subject: [PATCH] [ref] expand npu buffer size
+
+TCS :
+---
+ arch/arm64/boot/dts/telechips/tcc750x/tcc750x-npu.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/telechips/tcc750x/tcc750x-npu.dtsi b/arch/arm64/boot/dts/telechips/tcc750x/tcc750x-npu.dtsi
+index c597c81a5316..7ee7e1d3d920 100644
+--- a/arch/arm64/boot/dts/telechips/tcc750x/tcc750x-npu.dtsi
++++ b/arch/arm64/boot/dts/telechips/tcc750x/tcc750x-npu.dtsi
+@@ -19,7 +19,7 @@ npu0: npu@11000000 {
+ 		clock-names = "npubus_aclk", "npubus_pclk", "npubus_cclk", "npubus_cpu";
+ 		status = "disabled";
+ 
+-		work-buffer-size = <100000000>;
++		work-buffer-size = <200000000>;
+ 
+         aclk-freq = <800000000>;
+         pclk-freq = <200000000>;
+@@ -39,7 +39,7 @@ npu1: npu@11000400 {
+ 		clock-names = "npubus_aclk", "npubus_pclk", "npubus_cclk", "npubus_cpu";
+ 		status = "disabled";
+ 
+-		work-buffer-size = <100000000>;
++		work-buffer-size = <200000000>;
+ 
+         aclk-freq = <800000000>;
+         pclk-freq = <200000000>;
+-- 
+2.25.1
+

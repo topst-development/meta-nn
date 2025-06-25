@@ -1,0 +1,1 @@
+INITSCRIPT_PARAMS = "start 07 S ."

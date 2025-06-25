@@ -1,0 +1,9 @@
+[Unit]
+Description=Monitor the update file for changes
+
+[Path]
+PathChanged=/home/root/update
+Unit=update-trigger.service
+
+[Install]
+WantedBy=multi-user.target
